@@ -151,6 +151,10 @@ textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:1
 .switch[aria-checked="true"]{background:var(--green)}
 .switch[aria-checked="true"] i{left:23px}
 @media (prefers-reduced-motion:no-preference){.switch i{transition:left .15s}}
+.rename{display:flex;align-items:center;gap:8px;border-bottom:2px dashed var(--line);color:var(--muted);padding-bottom:2px}
+.rename:focus-within{border-bottom-color:var(--accent);color:var(--accent)}
+.rename input{flex:1;min-width:0;border:none;background:transparent;font-family:var(--display);font-weight:700;font-size:26px;color:var(--ink);padding:0}
+.rename input:focus{outline:none}
 .note{white-space:pre-wrap;background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:15px}
 
 .empty{border:1px dashed var(--line);border-radius:var(--radius);padding:22px 16px;text-align:center;color:var(--muted)}
@@ -255,7 +259,7 @@ function del(id){
   S.docs.delete(id);pending.delete(id);pendingDel.add(id);lsSave();
   if(col)queue(id,()=>col.doc(id).delete());
 }
-let activeT=null,incT=null;
+let activeT=null,incT=null,nameT=null;
 function saveActive(){
   clearTimeout(activeT);
   activeT=setTimeout(()=>{if(S.active){S.active.updatedAt=Date.now();put("active",{kind:"active",workout:S.active,updatedAt:S.active.updatedAt})}},700);
@@ -461,7 +465,7 @@ function cleanExercises(a){
 }
 function sHist(id){
   const w=S.docs.get(id);if(!w)return `<p>That workout was deleted.</p>`;const u=w.units||U();
-  return `<div class="panel-h"><div><h1 style="font-size:26px">${esc(w.name||"Workout")}</h1><div class="muted small">${day(w.endedAt)} · ${dur(w.endedAt-w.startedAt)}</div></div><button class="x" data-act="close" aria-label="Close">×</button></div>
+  return `<div class="panel-h"><div style="flex:1;min-width:0"><label class="rename"><input id="histname" data-id="${esc(id)}" value="${esc(w.name||"Workout")}" aria-label="Workout name" enterkeyhint="done"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/></svg></label><div class="muted small">${day(w.endedAt)} · ${dur(w.endedAt-w.startedAt)}</div></div><button class="x" data-act="close" aria-label="Close">×</button></div>
   ${w.rating?`<div class="row" style="align-items:center">${rateBars(w.rating)}<b>${RATE[w.rating-1]}</b></div>`:""}
   ${w.note?`<div class="note">${esc(w.note)}</div>`:""}
   ${w.exercises.map(e=>`<div class="card"><div class="ex-name" style="font-size:20px">${esc(e.name)} ${e.moveUp?'<span class="upb">↑ Move up</span>':""}</div><div class="num" style="margin-top:4px">${e.sets.map((s,i)=>`<div class="kv" style="padding:6px 0"><span class="muted">Set ${i+1}</span><span>${fw(s.w)} ${u} × ${s.r}</span></div>`).join("")}</div></div>`).join("")}
@@ -518,6 +522,7 @@ function newWorkout(name,exs){
   S.active={id:"w-"+Date.now(),name:name||"Workout",startedAt:Date.now(),updatedAt:Date.now(),exercises:exs||[]};
   saveActive();wake();render();
 }
+function renameWorkout(id,name){const w=S.docs.get(id);name=(name||"").trim();if(!w||!name||name===w.name)return;put(id,{...w,name});S.forceRender=true;render();toast("Renamed")}
 function resumeWorkout(id){
   const w=S.docs.get(id);if(!w||S.active)return;
   S.active={id:w.id,name:w.name||"Workout",startedAt:w.startedAt,updatedAt:Date.now(),resumed:true,prevRating:w.rating||0,prevNote:w.note||"",
@@ -615,6 +620,7 @@ document.addEventListener("input",e=>{
   const el=e.target;
   if(el.id==="exsearch"){S.search=el.value;$("exlist").innerHTML=exList();return}
   if(el.id==="fnote"&&S.finish){S.finish.note=el.value;return}
+  if(el.id==="histname"){const id=el.dataset.id;clearTimeout(nameT);nameT=setTimeout(()=>renameWorkout(id,el.value),600);return}
   if(el.id==="tplname"&&S.finish){S.finish.tplName=el.value;return}
   if(el.id==="incinput"){el.value=el.value.replace(/[^0-9.,]/g,"");const v=num(el.value);clearTimeout(incT);if(v>0&&v<=500)incT=setTimeout(()=>{put("settings",{...settings(),kind:"settings",inc:Math.round(v*100)/100});S.forceRender=true;render()},500);return}
   if(!S.active)return;
@@ -623,8 +629,10 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&e.target.id==="exsearch"){const b=$("exlist").querySelector("[data-act=pickex]");if(b)act(b)}
+  if(e.key==="Enter"&&e.target.id==="histname"){e.target.blur()}
   if(e.key==="Escape"&&S.sheet)closeSheet();
 });
+document.addEventListener("focusout",e=>{if(e.target.id==="histname"){clearTimeout(nameT);renameWorkout(e.target.dataset.id,e.target.value);if(!e.target.value.trim()){const w=S.docs.get(e.target.dataset.id);if(w)e.target.value=w.name||"Workout"}}});
 document.addEventListener("focusout",()=>setTimeout(()=>{if(needsRender){const ae=document.activeElement;if(!(ae&&$("main").contains(ae)&&/INPUT|TEXTAREA/.test(ae.tagName)))render()}},0));
 
 /* ---------- timers ---------- */
