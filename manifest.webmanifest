@@ -1,0 +1,15 @@
+{
+  "name": "GetJacked",
+  "short_name": "GetJacked",
+  "description": "Track your lifts, working weights and when to move up.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1217",
+  "theme_color": "#0e1217",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
