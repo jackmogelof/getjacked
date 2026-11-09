@@ -282,6 +282,7 @@ function rateBars(n){return `<span class="rate" aria-label="Rated ${n} of 5">${[
 function vStart(){
   const ws=workouts(),last=ws[0],mine=templates();
   return `
+  ${backupBanner()}
   <div class="section"><h1>Ready to lift?</h1>
   <button class="btn primary big" data-act="start">Start empty workout</button></div>
   ${last?`<div class="section"><h2>Last session</h2><button class="item" data-act="hist" data-id="${esc(last.id)}"><div class="grow"><div class="t">${esc(last.name||"Workout")}</div><div class="s">${day(last.endedAt)} · ${dur(last.endedAt-last.startedAt)} · ${last.exercises.length} lifts</div></div>${last.rating?rateBars(last.rating):""}</button></div>`:""}
@@ -358,7 +359,7 @@ function vCal(ws){
 }
 function vHistory(){
   const ws=workouts();
-  return `<h1>History</h1>${vCal(ws)}
+  return `<h1>History</h1>${backupBanner()}${vCal(ws)}
   ${!ws.length?`<div class="empty"><b>No workouts yet</b>Finish your first workout and it shows up here with your rating and notes.</div>`:
   `<div class="section"><h2>All workouts</h2><div class="list">${ws.map(w=>{
     const sets=w.exercises.reduce((n,e)=>n+e.sets.length,0);
@@ -483,6 +484,7 @@ function sSettings(){
   <p class="muted small" style="margin:0">Units only change the labels; past weights aren't converted.</p>
   <div class="section"><h2>Backup</h2>
   <p class="muted small" style="margin:0">${STANDALONE?"Your workouts are stored on this phone. Save a backup now and then, and before switching phones.":"Save a backup to move your workouts to another copy of GetJacked."}</p>
+  ${STANDALONE?`<p class="small" style="margin:0">Last backup: <b>${settings().lastBackup?day(settings().lastBackup):"never"}</b>. You'll get a reminder once a week.</p>`:""}
   <div class="row"><button class="btn" data-act="bksave">Save backup file</button><button class="btn" data-act="bkcopy">Copy backup</button></div>
   ${S.sheet.showText?`<textarea readonly id="bkout" aria-label="Backup text">${esc(S.sheet.showText)}</textarea><p class="muted small" style="margin:0">Copying was blocked here. Select all of the text above and copy it.</p>`:""}
   <label class="btn" for="restorefile" style="display:flex;align-items:center;justify-content:center">Restore from file</label><input type="file" id="restorefile" accept=".json,application/json,text/plain" hidden>
@@ -536,7 +538,8 @@ function act(el){
     case "restlen":put("settings",{...settings(),kind:"settings",rest:+el.dataset.v});drawSheet();break;
     case "close":closeSheet();break;
     case "bksave":saveBackup();break;
-    case "bkcopy":{const d=backupData();try{navigator.clipboard.writeText(d).then(()=>toast("Backup copied"),()=>{S.sheet.showText=d;drawSheet()})}catch(e){S.sheet.showText=d;drawSheet()}break}
+    case "bkcopy":{const d=backupData();try{navigator.clipboard.writeText(d).then(()=>{markBackup();toast("Backup copied")},()=>{S.sheet.showText=d;drawSheet()})}catch(e){S.sheet.showText=d;drawSheet()}break}
+    case "bklater":put("settings",{...settings(),kind:"settings",snooze:Date.now()+864e5});S.forceRender=true;render();break;
     case "bkpaste":restoreFrom(($("restoretext")||{}).value||"");break;
     case "calprev":case "calnext":{const n=new Date(),c=S.cal||{y:n.getFullYear(),m:n.getMonth()},d=new Date(c.y,c.m+(a==="calnext"?1:-1),1);
       if(d>n)break;S.cal={y:d.getFullYear(),m:d.getMonth()};S.forceRender=true;render();break}
@@ -550,14 +553,20 @@ document.addEventListener("click",e=>{
   const tab=e.target.closest("[data-tab]");if(tab){S.view=tab.dataset.tab;S.forceRender=true;render();window.scrollTo(0,0);return}
   if(e.target===$("sheet"))closeSheet();
 });
+function markBackup(){put("settings",{...settings(),kind:"settings",lastBackup:Date.now(),snooze:0});S.forceRender=true;render();if(S.sheet)drawSheet()}
+function backupDue(){if(!STANDALONE||!workouts().length)return false;const st=settings();if(st.snooze&&Date.now()<st.snooze)return false;
+  return Date.now()-(st.lastBackup||st.firstSeen||Date.now())>=7*864e5}
+function backupBanner(){if(!backupDue())return "";const lb=settings().lastBackup,d=lb?Math.floor((Date.now()-lb)/864e5):0;
+  return `<div class="card section" style="border-color:var(--yellow)"><div><b>Time for your weekly backup</b><div class="muted small">${lb?`Last backup was ${d} days ago.`:"You haven't saved a backup yet."} Tap Save, then choose Save to Files → iCloud Drive.</div></div>
+  <div class="row"><button class="btn primary" data-act="bksave">Save backup</button><button class="btn ghost" data-act="bklater">Remind me tomorrow</button></div></div>`}
 function backupData(){const docs={};S.docs.forEach((v,k)=>{if(k!=="active")docs[k]=v});return JSON.stringify({app:"GetJacked",version:1,exportedAt:new Date().toISOString(),docs})}
 async function saveBackup(){
   const name="getjacked-backup-"+new Date().toISOString().slice(0,10)+".json",data=backupData();
   if(STANDALONE){
-    try{const f=new File([data],name,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"GetJacked backup"});return}}catch(e){if(e&&e.name==="AbortError")return}
-    try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast("Backup saved")}catch(e){toast("Couldn't save a file. Use Copy backup.")}
+    try{const f=new File([data],name,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"GetJacked backup"});markBackup();toast("Backup saved");return}}catch(e){if(e&&e.name==="AbortError")return}
+    try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);markBackup();toast("Backup saved")}catch(e){toast("Couldn't save a file. Use Copy backup.")}
     return}
-  try{const dl=window.claude&&await claude.use("downloads");if(!dl){toast("Saving files isn't available here. Use Copy backup.");return}await dl.save({filename:name,data});toast("Backup saved")}
+  try{const dl=window.claude&&await claude.use("downloads");if(!dl){toast("Saving files isn't available here. Use Copy backup.");return}await dl.save({filename:name,data});markBackup();toast("Backup saved")}
   catch(e){if(e&&e.code==="declined")return;toast("Couldn't save the file. Use Copy backup.")}
 }
 function restoreFrom(text){
@@ -616,6 +625,7 @@ render();
 (async()=>{
   let db=null,user=null,uid=null;
   if(STANDALONE){setSync("local","Saved on this phone");mode="local";
+    if(!settings().firstSeen){put("settings",{...settings(),kind:"settings",firstSeen:Date.now()});}
     try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
     try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
     return}
