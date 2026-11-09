@@ -287,8 +287,7 @@ function vStart(){
   <button class="btn primary big" data-act="start">Start empty workout</button></div>
   ${last?`<div class="section"><h2>Last session</h2><button class="item" data-act="hist" data-id="${esc(last.id)}"><div class="grow"><div class="t">${esc(last.name||"Workout")}</div><div class="s">${day(last.endedAt)} · ${dur(last.endedAt-last.startedAt)} · ${last.exercises.length} lifts</div></div>${last.rating?rateBars(last.rating):""}</button></div>`:""}
   <div class="section"><h2>Your routines</h2>
-  ${mine.length?`<div class="list">${mine.map(t=>tplItem(t,true)).join("")}</div>`:`<p class="muted small" style="margin:0">Mid-workout, tap <b>Save as routine</b> and it appears here for one-tap starts.</p>`}</div>
-  <div class="section"><h2>Starter routines</h2><div class="list">${STARTERS.map(t=>tplItem(t,false)).join("")}</div></div>`;
+  ${mine.length?`<div class="list">${mine.map(t=>tplItem(t,true)).join("")}</div>`:`<p class="muted small" style="margin:0">Mid-workout, tap <b>Save as routine</b> and it appears here for one-tap starts.</p>`}</div>`;
 }
 function tplItem(t,mine){
   return `<div class="item"><div class="grow"><div class="t">${esc(t.name)}</div><div class="s">${t.exercises.map(e=>esc(e.name)).join(" · ")}</div></div>

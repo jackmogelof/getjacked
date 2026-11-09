@@ -1,5 +1,5 @@
 // GetJacked offline support: serve the app from cache, refresh it in the background.
-const CACHE = "getjacked-v2";
+const CACHE = "getjacked-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
