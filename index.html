@@ -23,6 +23,7 @@
   --bg:#eceff3; --surface:#ffffff; --surface-2:#f5f7fa; --ink:#141a22; --muted:#5b6674; --line:#d3d9e1;
   --accent:#1d5bd6; --accent-soft:#dfe8fb; --accent-ink:#ffffff;
   --red:#c8312b; --green:#2c8547; --yellow:#d99a0b;
+  --r1:#c8312b; --r2:#e07a22; --r3:#e2b01a; --r4:#7cb342; --r5:#2c8547; --r1t:#ffffff; --r2t:#ffffff; --r3t:#141a22; --r4t:#141a22; --r5t:#ffffff;
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --radius:12px;
@@ -30,11 +31,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0e1217; --surface:#171d25; --surface-2:#1e252f; --ink:#e8edf3; --muted:#94a1b0; --line:#2b3440;
   --accent:#5c90f2; --accent-soft:#1d2b45; --accent-ink:#0b1220;
-  --red:#ef5d55; --green:#4fb86e; --yellow:#f1bf40; color-scheme:dark }}
+  --red:#ef5d55; --green:#4fb86e; --yellow:#f1bf40; --r1:#ef5d55; --r2:#f0913f; --r3:#f1c540; --r4:#94cc5c; --r5:#4fb86e; --r1t:#160606; --r2t:#160d04; --r3t:#141a22; --r4t:#0c1407; --r5t:#06140a; color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#0e1217; --surface:#171d25; --surface-2:#1e252f; --ink:#e8edf3; --muted:#94a1b0; --line:#2b3440;
   --accent:#5c90f2; --accent-soft:#1d2b45; --accent-ink:#0b1220;
-  --red:#ef5d55; --green:#4fb86e; --yellow:#f1bf40; color-scheme:dark }
+  --red:#ef5d55; --green:#4fb86e; --yellow:#f1bf40; --r1:#ef5d55; --r2:#f0913f; --r3:#f1c540; --r4:#94cc5c; --r5:#4fb86e; --r1t:#160606; --r2t:#160d04; --r3t:#141a22; --r4t:#0c1407; --r5t:#06140a; color-scheme:dark }
 
 *{box-sizing:border-box}
 html,body{background:var(--bg)}
@@ -112,13 +113,13 @@ tr.done .check{background:var(--accent);border-color:var(--accent);color:var(--a
 /* rating plates */
 .rate{display:inline-flex;gap:3px;align-items:center}
 .rate i{display:block;width:8px;height:14px;border-radius:2px;background:var(--line)}
-.rate i.on{background:var(--accent)}
+.rate i.on{background:var(--rc,var(--accent))}
 .rate-pick{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .rate-pick button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:4px}
 .rate-pick b{font-family:var(--display);font-size:24px;line-height:1}
 .rate-pick span{font-size:11px;color:var(--muted);letter-spacing:.02em}
-.rate-pick button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.rate-pick button[aria-pressed="true"] span{color:var(--accent-ink)}
+.rate-pick button[aria-pressed="true"]{background:var(--rc);border-color:var(--rc);color:var(--rct)}
+.rate-pick button[aria-pressed="true"] span{color:var(--rct)}
 
 textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:10px 12px;font-size:16px;resize:vertical}
 .field{width:100%;height:46px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:0 12px;font-size:16px}
@@ -143,7 +144,7 @@ textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:1
 .cal .d.today{outline:2px solid var(--ink);outline-offset:1px}
 .cal .multi{position:absolute;top:2px;right:4px;font-size:10px;color:var(--muted)}
 .legend{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
-.legend i{display:block;width:14px;height:14px;border-radius:4px;background:var(--accent)}
+.legend i{display:block;width:14px;height:14px;border-radius:4px}
 .legend i.ol{background:transparent;box-shadow:inset 0 0 0 2px var(--accent);margin-left:10px}
 .switch{flex:none;width:52px;height:32px;border-radius:16px;border:none;background:var(--line);position:relative;padding:0}
 .switch i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
@@ -254,7 +255,7 @@ function del(id){
   S.docs.delete(id);pending.delete(id);pendingDel.add(id);lsSave();
   if(col)queue(id,()=>col.doc(id).delete());
 }
-let activeT=null;
+let activeT=null,incT=null;
 function saveActive(){
   clearTimeout(activeT);
   activeT=setTimeout(()=>{if(S.active){S.active.updatedAt=Date.now();put("active",{kind:"active",workout:S.active,updatedAt:S.active.updatedAt})}},700);
@@ -283,7 +284,7 @@ function render(){
   $("main").innerHTML=S.view==="workout"?(S.active?vActive():vStart()):S.view==="history"?vHistory():vLifts();
   tickElapsed();
 }
-function rateBars(n){return `<span class="rate" aria-label="Rated ${n} of 5">${[1,2,3,4,5].map(i=>`<i class="${i<=n?"on":""}"></i>`).join("")}</span>`}
+function rateBars(n){return `<span class="rate" style="--rc:var(--r${n})" aria-label="Rated ${n} of 5">${[1,2,3,4,5].map(i=>`<i class="${i<=n?"on":""}"></i>`).join("")}</span>`}
 
 function vStart(){
   const ws=workouts(),last=ws[0],mine=templates();
@@ -336,7 +337,7 @@ function upBtn(ex,i){
   ${r&&ex.moveUp===undefined?`<div class="muted small" style="text-align:center">3 sets done at ${fw(t)}. Tap to undo if you missed reps.</div>`:""}</div>`;
 }
 
-const OP=[.22,.38,.55,.75,1];
+
 function weekKey(t){const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d.getTime()}
 function streak(ws){const set=new Set(ws.map(w=>weekKey(w.endedAt)));const d=new Date(weekKey(Date.now()));if(!set.has(d.getTime()))d.setDate(d.getDate()-7);let n=0;while(set.has(d.getTime())){n++;d.setDate(d.getDate()-7)}return n}
 function vCal(ws){
@@ -353,14 +354,14 @@ function vCal(ws){
     if(!list){cells+=`<span class="d${today?" today":""}"><span>${k}</span></span>`;continue}
     const r=Math.max(0,...list.map(w=>w.rating||0));
     cells+=`<button class="d has${r?"":" unrated"}${today?" today":""}" data-act="hist" data-id="${esc(list[0].id)}" aria-label="${day(list[0].endedAt)}: ${esc(list[0].name||"Workout")}${r?", rated "+r:""}">
-      ${r?`<i class="f" style="opacity:${OP[r-1]}"></i>`:""}<span style="${r>=3?"color:var(--accent-ink)":""}">${k}</span>${list.length>1?`<b class="multi">${list.length}</b>`:""}</button>`;
+      ${r?`<i class="f" style="background:var(--r${r})"></i>`:""}<span style="${r?`color:var(--r${r}t)`:""}">${k}</span>${list.length>1?`<b class="multi">${list.length}</b>`:""}</button>`;
   }
   const label=new Date(c.y,c.m,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
   return `<div class="card section">
     <div class="panel-h"><button class="x" data-act="calprev" aria-label="Previous month">‹</button><div style="font-family:var(--display);font-weight:700;font-size:22px">${label}</div><button class="x" data-act="calnext" aria-label="Next month" ${isNow?"disabled style='opacity:.3'":""}>›</button></div>
     <div class="stats"><div class="stat"><b>${inMonth.length}</b><span>Workouts</span></div><div class="stat"><b>${st}</b><span>Week streak</span></div><div class="stat"><b>${avg}</b><span>Avg rating</span></div></div>
     <div class="cal">${["S","M","T","W","T","F","S"].map(d=>`<span class="wd">${d}</span>`).join("")}${cells}</div>
-    <div class="legend"><span>Rough</span>${OP.map(o=>`<i style="opacity:${o}"></i>`).join("")}<span>Crushed it</span><i class="ol"></i><span>No rating</span></div>
+    <div class="legend"><span>Rough</span>${[1,2,3,4,5].map(n=>`<i style="background:var(--r${n})"></i>`).join("")}<span>Crushed it</span><i class="ol"></i><span>No rating</span></div>
   </div>`;
 }
 function vHistory(){
@@ -440,7 +441,7 @@ function sFinish(){
   ${sm.prs.length?`<div class="list">${sm.prs.map(p=>`<div class="item"><span class="pr">PR</span><div class="grow"><div class="t">${esc(p.name)}</div><div class="s">${fw(p.s.w)} ${u} × ${p.s.r}</div></div></div>`).join("")}</div>`:""}
   ${sm.ups.length?`<div class="section"><h2>Moving up next time</h2><div class="list">${sm.ups.map(e=>`<div class="item"><span class="upb">↑</span><div class="grow"><div class="t">${esc(e.name)}</div></div><b class="num">${fw(topSet(e.sets).w)} → ${fw(topSet(e.sets).w+inc())} ${u}</b></div>`).join("")}</div></div>`:""}
   ${sm.sets?"":`<p class="small" style="margin:0;color:var(--red)">No sets with weight and reps yet. Fill some in or check them off before saving.</p>`}
-  <div class="section"><h2>How did it go?</h2><div class="rate-pick">${RATE.map((l,i)=>`<button data-act="rate" data-v="${i+1}" aria-pressed="${f.rating===i+1}"><b>${i+1}</b><span>${l}</span></button>`).join("")}</div></div>
+  <div class="section"><h2>How did it go?</h2><div class="rate-pick">${RATE.map((l,i)=>`<button data-act="rate" data-v="${i+1}" aria-pressed="${f.rating===i+1}" style="--rc:var(--r${i+1});--rct:var(--r${i+1}t)"><b>${i+1}</b><span>${l}</span></button>`).join("")}</div></div>
   <div class="section"><h2>Note</h2><textarea id="fnote" placeholder="Energy, sleep, form cues, what to change next time…">${esc(f.note)}</textarea></div>
   ${qsToggle()}
   <button class="btn primary big" data-act="save" ${sm.sets?"":"disabled style='opacity:.5'"}>Save workout</button>
@@ -499,7 +500,7 @@ function sSettings(){
   return `<div class="panel-h"><h1 style="font-size:26px">Settings</h1><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="kv"><span>Units</span><span class="seg">${["lb","kg"].map(v=>`<button data-act="units" data-v="${v}" aria-pressed="${st.units===v}">${v}</button>`).join("")}</span></div>
   <div class="kv"><span>Rest timer</span><span class="seg">${[60,90,120,180].map(v=>`<button data-act="restlen" data-v="${v}" aria-pressed="${st.rest===v}">${clock(v)}</button>`).join("")}</span></div>
-  <div class="kv"><span>Weight jump</span><span class="seg">${(st.units==="kg"?[1,2.5,5]:[2.5,5,10]).map(v=>`<button data-act="incset" data-v="${v}" aria-pressed="${inc()===v}">+${v}</button>`).join("")}</span></div>
+  <div class="kv"><span>Weight jump</span><span style="display:flex;align-items:center;gap:6px"><span class="muted">+</span><input id="incinput" class="field num" inputmode="decimal" value="${fw(inc())}" aria-label="Weight jump in ${st.units}" style="width:84px;text-align:center"><span class="muted">${st.units}</span></span></div>
   <div class="kv"><span>Saving</span><span class="muted small">${esc(c)}</span></div>
   <p class="muted small" style="margin:0">Units only change the labels; past weights aren't converted.</p>
   <div class="section"><h2>Backup</h2>
@@ -563,7 +564,6 @@ function act(el){
     case "lift":openSheet("lift",{name:el.dataset.name});break;
     case "settings":openSheet("settings");break;
     case "units":put("settings",{...settings(),kind:"settings",units:el.dataset.v,inc:el.dataset.v==="kg"?2.5:5});drawSheet();S.forceRender=true;render();break;
-    case "incset":put("settings",{...settings(),kind:"settings",inc:+el.dataset.v});drawSheet();break;
     case "moveup":{const ex=S.active.exercises[i];ex.moveUp=!isReady(ex);saveActive();S.forceRender=true;render();break}
     case "restlen":put("settings",{...settings(),kind:"settings",rest:+el.dataset.v});drawSheet();break;
     case "close":closeSheet();break;
@@ -616,6 +616,7 @@ document.addEventListener("input",e=>{
   if(el.id==="exsearch"){S.search=el.value;$("exlist").innerHTML=exList();return}
   if(el.id==="fnote"&&S.finish){S.finish.note=el.value;return}
   if(el.id==="tplname"&&S.finish){S.finish.tplName=el.value;return}
+  if(el.id==="incinput"){el.value=el.value.replace(/[^0-9.,]/g,"");const v=num(el.value);clearTimeout(incT);if(v>0&&v<=500)incT=setTimeout(()=>{put("settings",{...settings(),kind:"settings",inc:Math.round(v*100)/100});S.forceRender=true;render()},500);return}
   if(!S.active)return;
   if(el.dataset.f==="name"){S.active.name=el.value;saveActive();return}
   if(el.dataset.f==="w"||el.dataset.f==="r"){S.active.exercises[+el.dataset.ex].sets[+el.dataset.set][el.dataset.f]=el.value.replace(/[^0-9.,]/g,"");saveActive()}
