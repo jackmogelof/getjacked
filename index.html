@@ -268,10 +268,11 @@ function setSync(s,txt){mode=s==="error"?mode:s;const c=$("sync");c.dataset.s=s;
 
 const workouts=()=>[...S.docs.values()].filter(d=>d.kind==="workout").sort((a,b)=>b.endedAt-a.endedAt);
 const templates=()=>[...S.docs.entries()].filter(([,d])=>d.kind==="template").map(([id,d])=>({...d,id})).sort((a,b)=>b.createdAt-a.createdAt);
-function lastFor(name){for(const w of workouts()){const ex=w.exercises.find(e=>e.name===name);if(ex&&ex.sets.length)return{sets:ex.sets,at:w.endedAt,moveUp:!!ex.moveUp}}return null}
+const others=()=>workouts().filter(w=>!S.active||w.id!==S.active.id);
+function lastFor(name){for(const w of others()){const ex=w.exercises.find(e=>e.name===name);if(ex&&ex.sets.length)return{sets:ex.sets,at:w.endedAt,moveUp:!!ex.moveUp}}return null}
 const better=(a,b)=>!b||a.w>b.w||(a.w===b.w&&a.r>b.r);
 function topSet(sets){let t=null;for(const s of sets)if(s.w>0&&better(s,t))t=s;return t}
-function bestFor(name){let b=null;for(const w of workouts()){const ex=w.exercises.find(e=>e.name===name);if(!ex)continue;const t=topSet(ex.sets);if(t&&better(t,b))b={w:t.w,r:t.r,at:w.endedAt}}return b}
+function bestFor(name){let b=null;for(const w of others()){const ex=w.exercises.find(e=>e.name===name);if(!ex)continue;const t=topSet(ex.sets);if(t&&better(t,b))b={w:t.w,r:t.r,at:w.endedAt}}return b}
 
 /* ---------- render ---------- */
 function render(){
@@ -309,7 +310,8 @@ function vActive(){
   <button class="btn dashed" data-act="addex">+ Add exercise</button>
   <button class="btn primary big" data-act="finish">Finish workout</button>
   <div class="row">
-  <button class="btn ghost danger ${S.armed==="discard"?"armed":""}" data-act="discard">${S.armed==="discard"?"Tap again to discard":"Discard"}</button></div>`;
+  <button class="btn ghost danger ${S.armed==="discard"?"armed":""}" data-act="discard">${S.armed==="discard"?"Tap again to discard":S.active.resumed?"Discard changes":"Discard"}</button></div>
+  ${S.active.resumed?`<p class="muted small" style="margin:0;text-align:center">You reopened this workout. Discarding keeps the version you saved before.</p>`:""}`;
 }
 function vEx(ex,i){
   const last=lastFor(ex.name),best=bestFor(ex.name),u=U();
@@ -363,7 +365,8 @@ function vCal(ws){
 }
 function vHistory(){
   const ws=workouts();
-  return `<h1>History</h1>${backupBanner()}${vCal(ws)}
+  const recent=!S.active&&ws[0]&&Date.now()-ws[0].endedAt<30*60000?ws[0]:null;
+  return `<h1>History</h1>${recent?`<div class="card section"><div><b>Finished ${esc(recent.name||"Workout")} too early?</b><div class="muted small">Reopen it to keep logging sets.</div></div><button class="btn primary" data-act="resume" data-id="${esc(recent.id)}">Resume workout</button></div>`:""}${backupBanner()}${vCal(ws)}
   ${!ws.length?`<div class="empty"><b>No workouts yet</b>Finish your first workout and it shows up here with your rating and notes.</div>`:
   `<div class="section"><h2>All workouts</h2><div class="list">${ws.map(w=>{
     const sets=w.exercises.reduce((n,e)=>n+e.sets.length,0);
@@ -440,7 +443,8 @@ function sFinish(){
   <div class="section"><h2>How did it go?</h2><div class="rate-pick">${RATE.map((l,i)=>`<button data-act="rate" data-v="${i+1}" aria-pressed="${f.rating===i+1}"><b>${i+1}</b><span>${l}</span></button>`).join("")}</div></div>
   <div class="section"><h2>Note</h2><textarea id="fnote" placeholder="Energy, sleep, form cues, what to change next time…">${esc(f.note)}</textarea></div>
   ${qsToggle()}
-  <button class="btn primary big" data-act="save" ${sm.sets?"":"disabled style='opacity:.5'"}>Save workout</button>`;
+  <button class="btn primary big" data-act="save" ${sm.sets?"":"disabled style='opacity:.5'"}>Save workout</button>
+  <button class="btn ghost" data-act="close">Back to workout</button>`;
 }
 function qsToggle(){
   const f=S.finish,a=S.active,existing=a.tplId&&S.docs.get(a.tplId);
@@ -460,6 +464,7 @@ function sHist(id){
   ${w.rating?`<div class="row" style="align-items:center">${rateBars(w.rating)}<b>${RATE[w.rating-1]}</b></div>`:""}
   ${w.note?`<div class="note">${esc(w.note)}</div>`:""}
   ${w.exercises.map(e=>`<div class="card"><div class="ex-name" style="font-size:20px">${esc(e.name)} ${e.moveUp?'<span class="upb">↑ Move up</span>':""}</div><div class="num" style="margin-top:4px">${e.sets.map((s,i)=>`<div class="kv" style="padding:6px 0"><span class="muted">Set ${i+1}</span><span>${fw(s.w)} ${u} × ${s.r}</span></div>`).join("")}</div></div>`).join("")}
+  ${S.active?"":`<button class="btn" data-act="resume" data-id="${esc(id)}">Resume workout</button>`}
   <button class="btn" data-act="histqs" data-id="${esc(id)}">Add to Quick Start</button>
   <button class="btn danger ${S.armed==="del"+id?"armed":""}" data-act="delw" data-id="${esc(id)}">${S.armed==="del"+id?"Tap again to delete":"Delete workout"}</button>`;
 }
@@ -512,6 +517,12 @@ function newWorkout(name,exs){
   S.active={id:"w-"+Date.now(),name:name||"Workout",startedAt:Date.now(),updatedAt:Date.now(),exercises:exs||[]};
   saveActive();wake();render();
 }
+function resumeWorkout(id){
+  const w=S.docs.get(id);if(!w||S.active)return;
+  S.active={id:w.id,name:w.name||"Workout",startedAt:w.startedAt,updatedAt:Date.now(),resumed:true,prevRating:w.rating||0,prevNote:w.note||"",
+    exercises:w.exercises.map(e=>{const ex={name:e.name,sets:e.sets.map(s=>({w:String(s.w),r:String(s.r),done:true}))};if(!!e.moveUp!==readyAuto(ex))ex.moveUp=!!e.moveUp;return ex})};
+  saveActive();closeSheet();S.view="workout";S.forceRender=true;render();wake();window.scrollTo(0,0);toast("Workout reopened");
+}
 function exFromName(name,n){const last=lastFor(name);n=n||(last?last.sets.length:3);return{name,sets:Array.from({length:n},()=>({w:"",r:"",done:false}))}}
 function arm(key){S.armed=key;clearTimeout(arm.t);arm.t=setTimeout(()=>{S.armed=null;S.forceRender=true;render();drawSheet()},3000)}
 function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2200)}
@@ -534,7 +545,7 @@ function act(el){
         if(!(num(s.w)>=0&&num(s.r)>0)){toast("Enter reps first");(s.r===""?ri:wi).focus();return}
         s.done=true;startRest()}else s.done=false;
       saveActive();S.forceRender=true;render();break}
-    case "finish":S.finish={rating:0,note:"",saveTpl:false,tplName:S.active.name&&S.active.name!=="Workout"?S.active.name:""};openSheet("finish");break;
+    case "finish":S.finish={rating:S.active.prevRating||0,note:S.active.prevNote||"",saveTpl:false,tplName:S.active.name&&S.active.name!=="Workout"?S.active.name:""};openSheet("finish");break;
     case "qstoggle":S.finish.saveTpl=!S.finish.saveTpl;drawSheet();if(S.finish.saveTpl){const n=$("tplname");if(n&&!n.value)n.focus()}break;
     case "rate":S.finish.rating=+el.dataset.v;S.finish.note=($("fnote")||{}).value||S.finish.note;drawSheet();break;
     case "save":{const sm=finishSummary();if(!sm.sets)return;const a0=S.active,now=Date.now();
@@ -544,6 +555,7 @@ function act(el){
         put(id,{kind:"template",name:(S.finish.tplName||"").trim()||w.name,createdAt:ex?ex.createdAt:now,exercises:sm.ex.map(e=>({name:e.name,sets:e.sets.length}))});qs=ex?" · Quick Start updated":" · added to Quick Start"}
       clearTimeout(activeT);del("active");S.active=null;stopRest();closeSheet();S.view="history";S.forceRender=true;render();
       toast((sm.prs.length?`Saved · ${sm.prs.length} new PR${sm.prs.length>1?"s":""}`:"Workout saved")+qs);break}
+    case "resume":resumeWorkout(el.dataset.id);break;
     case "histqs":{const w=S.docs.get(el.dataset.id);if(!w)break;put("t-"+Date.now(),{kind:"template",name:w.name||"Workout",createdAt:Date.now(),exercises:w.exercises.map(e=>({name:e.name,sets:e.sets.length}))});toast("Added to Quick Start");break}
     case "discard":if(S.armed==="discard"){clearTimeout(activeT);del("active");S.active=null;S.armed=null;stopRest()}else arm("discard");S.forceRender=true;render();break;
     case "hist":openSheet("hist",{id:el.dataset.id});break;
