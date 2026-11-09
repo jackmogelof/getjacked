@@ -626,7 +626,7 @@ render();
   if(STANDALONE){setSync("local","Saved on this phone");mode="local";
     if(!settings().firstSeen){put("settings",{...settings(),kind:"settings",firstSeen:Date.now()});}
     try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-    try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
+    try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").then(r=>document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")r.update().catch(()=>{})})).catch(()=>{})}catch(e){}
     return}
   try{if(window.claude&&claude.use){[db,user]=await Promise.all([claude.use("db"),claude.use("user")]);uid=user?await user.id():null}}catch(e){}
   if(!db||!uid){setSync("local","This device only");mode="local";return}
