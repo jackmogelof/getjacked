@@ -1,7 +1,7 @@
 // GetJacked offline support.
 // Pages: network first (so updates show up on the next open), saved copy when offline.
 // Icons and fonts: saved copy first, refreshed in the background.
-const CACHE = "getjacked-v4";
+const CACHE = "getjacked-v5";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
